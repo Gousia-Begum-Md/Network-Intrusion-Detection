@@ -15,7 +15,7 @@ hide_style = """
     header {visibility: hidden;}
     </style>
     """
-st.markdown(hide_style, unsafe_content_type=True)
+st.markdown(hide_style, unsafe_allow_html=True)
 
 # --- 1. INITIALIZATION ---
 if 'page' not in st.session_state:
