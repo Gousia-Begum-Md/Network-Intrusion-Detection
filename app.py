@@ -5,6 +5,18 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
+st.set_page_config(layout="wide")
+
+# Hide the Streamlit header and footer using CSS
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """
+st.markdown(hide_style, unsafe_content_type=True)
+
 # --- 1. INITIALIZATION ---
 if 'page' not in st.session_state:
     st.session_state.page = "Home"
