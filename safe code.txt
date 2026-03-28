@@ -1,0 +1,221 @@
+import streamlit as st
+import pandas as pd
+import joblib
+import time
+import matplotlib.pyplot as plt
+import numpy as np
+
+# --- 1. INITIALIZATION ---
+if 'page' not in st.session_state:
+    st.session_state.page = "Home"
+if 'analyzed_data' not in st.session_state:
+    st.session_state.analyzed_data = None
+
+# --- 2. UI ---
+st.set_page_config(page_title="ANIDS", page_icon="🛡️", layout="wide")
+
+st.markdown("""
+<style>
+.stApp { 
+    background-color: #050801; 
+    color: #00ff9c;
+    background-image: radial-gradient(#0a2a1a 1px, transparent 1px);
+    background-size: 30px 30px;
+}
+
+@keyframes glow {
+    0% { text-shadow: 0 0 5px #00ff9c; opacity: 0.8; }
+    50% { text-shadow: 0 0 20px #00ff9c; opacity: 1; }
+    100% { text-shadow: 0 0 5px #00ff9c; opacity: 0.8; }
+}
+
+.main-title { 
+    font-family: 'Courier New', monospace; 
+    font-size: 3.5rem; 
+    text-align: center;
+    animation: glow 3s infinite;
+}
+
+section[data-testid="stSidebar"] { background-color: #0a0a0a !important; border-right: 2px solid #00ff9c; }
+
+.stButton>button { 
+    background-color: #050801; color: #00ff9c; border: 1px solid #00ff9c; 
+    width: 100%; font-weight: bold; border-radius: 8px;
+}
+.stButton>button:hover { 
+    background-color: #00ff9c !important; 
+    color: #000000 !important; 
+    box-shadow: 0 0 30px #00ff9c;
+}
+
+.info-card {
+    border: 1px solid #00ff9c;
+    padding: 20px;
+    border-radius: 10px;
+    background: rgba(0, 255, 156, 0.05);
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- MODEL ---
+@st.cache_resource
+def load_engine():
+    try:
+        return joblib.load('random_forest_model.pkl'), joblib.load('model_features.pkl')
+    except:
+        return None, None
+
+model, features = load_engine()
+
+def go_to(p):
+    st.session_state.page = p
+    st.rerun()
+
+# --- SIDEBAR ---
+with st.sidebar:
+    st.markdown("<h1 style='text-align: center;'>🛡️</h1>", unsafe_allow_html=True)
+    st.write("---")
+    if st.button("🏠 Home"): go_to("Home")
+    if st.button("📂 Scan Data"): go_to("Upload")
+    if st.button("🔍 Results"): go_to("Results")
+    st.write("---")
+    if st.session_state.analyzed_data is not None:
+        count = len(st.session_state.analyzed_data[st.session_state.analyzed_data['PRED'] == 1])
+        st.metric("QUARANTINED PACKETS", count)
+
+# --- HOME ---
+if st.session_state.page == "Home":
+    st.markdown("<h1 class='main-title'>ANIDS CONTROL PANEL</h1>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("""
+        <div class='info-card'>
+        <h3>🧠 Model Intelligence</h3>
+        <p>This system is powered by a Random Forest Classifier that analyzes network traffic patterns using multiple decision trees.</p>
+        <p>Each packet is evaluated across trees, and the final decision is based on collective voting.</p>
+        <p><b>Advantages:</b><br>
+        • Handles complex network data<br>
+        • Resistant to noise and anomalies<br>
+        • Captures feature interactions effectively</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+        <div class='info-card'>
+        <h3>🚀 Why ANIDS?</h3>
+        <ul>
+            <li>Real-Time Detection</li>
+            <li>Explainable Predictions</li>
+            <li>Visual Threat Analysis</li>
+            <li>Scalable for large datasets</li>
+        </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+    if st.button("INITIALIZE SYSTEM →"):
+        go_to("Upload")
+
+# --- UPLOAD ---
+elif st.session_state.page == "Upload":
+    st.title("📂 Data Ingestion")
+
+    file = st.file_uploader("Upload Network Traffic Dataset (CSV)", type="csv")
+
+    if file:
+        df = pd.read_csv(file)
+
+        st.write("### Sampled Traffic Snapshot")
+        st.write("Preview of selected network records used for threat analysis.")
+        st.dataframe(df.head(10), use_container_width=True)
+
+        if st.button("Run Intrusion Detection"):
+            with st.status("Analyzing Network Patterns...", expanded=True):
+                probs = model.predict_proba(df[features])
+                preds = model.predict(df[features])
+
+                df['PRED'] = preds
+                df['CONF'] = np.max(probs, axis=1) * 100
+
+                st.session_state.analyzed_data = df
+                time.sleep(1.5)
+                go_to("Results")
+
+# --- RESULTS ---
+elif st.session_state.page == "Results":
+    st.title("🔍 Results")
+
+    if st.session_state.analyzed_data is None:
+        st.info("No data available. Please upload dataset.")
+    else:
+        df = st.session_state.analyzed_data
+        threats = df[df['PRED'] == 1]
+
+        if threats.empty:
+            st.success("✅ No threats detected. Network is secure.")
+        else:
+            col1, col2 = st.columns([1,2])
+
+            # GRAPH
+            with col1:
+                st.write("### Prediction Distribution Overview")
+                fig, ax = plt.subplots()
+                ax.pie([len(threats), len(df)-len(threats)],
+                       labels=['Threat', 'Safe'],
+                       colors=['#ff4b4b', '#00ff9c'])
+                st.pyplot(fig)
+
+            # ANALYSIS
+            with col2:
+                idx = st.selectbox("Select Packet", threats.index)
+                packet = threats.loc[idx]
+
+                st.metric("Model Confidence Score", f"{packet['CONF']:.2f}%")
+                st.progress(packet['CONF']/100)
+
+                st.write("---")
+
+                # ATTACK TYPE LOGIC
+                if packet.get('rate', 0) > 5000:
+                    attack = "Denial-of-Service (DoS)"
+                    reason = "High packet transmission rate detected"
+                    prevention = [
+                        "Apply rate limiting",
+                        "Enable firewall filtering",
+                        "Monitor abnormal traffic spikes"
+                    ]
+                elif packet.get('sttl', 0) > 128:
+                    attack = "Reconnaissance / Probe"
+                    reason = "Suspicious TTL patterns detected"
+                    prevention = [
+                        "Block scanning IPs",
+                        "Enable IDS/IPS alerts",
+                        "Monitor port scan activity"
+                    ]
+                else:
+                    attack = "Unknown Anomaly"
+                    reason = "Irregular packet behavior detected"
+                    prevention = [
+                        "Inspect packet payload",
+                        "Enable deep packet inspection",
+                        "Monitor unusual connections"
+                    ]
+
+                st.error(f"🚨 Threat Identified: {attack}")
+
+                st.write("### Detection Reasoning")
+                st.write(reason)
+
+                st.write("### Recommended Mitigation")
+                for p in prevention:
+                    st.write(f"• {p}")
+
+            st.write("---")
+            st.subheader("📑 Packet Fingerprint")
+            st.dataframe(packet.to_frame().T, use_container_width=True)
+
+# --- FOOTER ---
+st.markdown("---")
+st.caption("ANIDS Framework | Intelligent Network Intrusion Detection System")

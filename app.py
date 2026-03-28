@@ -1,122 +1,149 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import time
 import matplotlib.pyplot as plt
+import numpy as np
 
-# -----------------------------
-# Page Configuration
-# -----------------------------
+# --- 1. INITIALIZATION ---
+if 'page' not in st.session_state:
+    st.session_state.page = "Home"
+if 'analyzed_data' not in st.session_state:
+    st.session_state.analyzed_data = None
 
-st.set_page_config(
-    page_title="Network Intrusion Detection",
-    page_icon="🛡️",
-    layout="wide"
-)
-
-# -----------------------------
-# Hacker Theme CSS
-# -----------------------------
+# --- 2. UI ---
+st.set_page_config(page_title="ANIDS", page_icon="🛡️", layout="wide")
 
 st.markdown("""
 <style>
-
-/* Main background */
-.stApp{
-background-color:#0b0f19;
-color:#00ff9c;
+.stApp { 
+    background-color: #050801; 
+    color: #00ff9c;
+    background-image: radial-gradient(#0a2a1a 1px, transparent 1px);
+    background-size: 30px 30px;
 }
 
-/* Text */
-h1,h2,h3,h4,h5,p,label{
-color:#00ff9c !important;
+@keyframes glow {
+    0% { text-shadow: 0 0 5px #00ff9c; opacity: 0.8; }
+    50% { text-shadow: 0 0 10px #00ff9c; opacity: 1; }
+    100% { text-shadow: 0 0 5px #00ff9c; opacity: 0.8; }
 }
 
-/* Sidebar */
-section[data-testid="stSidebar"]{
-background-color:#111827;
+.main-title { 
+    font-family: 'Courier New', monospace; 
+    font-size: 3.5rem; 
+    text-align: center;
+    animation: glow 3s infinite;
 }
 
-/* Button default */
-div.stButton > button{
-background-color:#1f2937;
-color:#00ff9c;
-font-weight:700;
-border-radius:10px;
-border:1px solid #00ff9c;
-padding:10px 20px;
-transition:0.3s;
+section[data-testid="stSidebar"] { 
+    background-color: #0a0a0a !important; 
+    border-right: 2px solid #00ff9c; 
 }
 
-/* Neon hover */
-div.stButton > button:hover{
-background-color:#00ff9c;
-color:#28282b !important;
-font-weight:700;
-box-shadow:0 0 5px #00ff9c;
+.stButton>button { 
+    background-color: #050801; 
+    color: #00ff9c; 
+    border: 1px solid #00ff9c; 
+    width: 100%; 
+    font-weight: bold; 
+    border-radius: 8px;
+}
+.stButton>button:hover { 
+    background-color: #00ff9c !important; 
+    color: #000000 !important; 
+    box-shadow: 0 0 30px #00ff9c;
 }
 
+.info-card {
+    border: 1px solid #00ff9c;
+    padding: 20px;
+    border-radius: 10px;
+    background: rgba(0, 255, 156, 0.05);
+}
+
+[data-testid="stMetric"] {
+    background: rgba(0,255,156,0.08);
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #00ff9c;
+    text-align: center;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# Load Model & Data
-# -----------------------------
+# --- MODEL ---
+@st.cache_resource
+def load_engine():
+    try:
+        return joblib.load('random_forest_model.pkl'), joblib.load('model_features.pkl')
+    except:
+        return None, None
 
-model = joblib.load("random_forest_model.pkl")
-sample = pd.read_csv("demo_sample.csv")
+model, features = load_engine()
 
-features = sample.columns
+def go_to(p):
+    st.session_state.page = p
+    st.rerun()
 
-# -----------------------------
-# Header
-# -----------------------------
+# --- SIDEBAR ---
+with st.sidebar:
+    st.markdown("<h1 style='text-align: center;'>🛡ANIDS️</h1>", unsafe_allow_html=True)
+    st.write("---")
+    if st.button("🏠 Home"): go_to("Home")
+    if st.button("📂 Scan Data"): go_to("Upload")
+    if st.button("🔍 Results"): go_to("Results")
+    st.write("---")
+    if st.session_state.analyzed_data is not None:
+        count = len(st.session_state.analyzed_data[st.session_state.analyzed_data['PRED'] == 1])
+        st.metric("PACKETS ANALYZED", count)
 
-st.title("🛡️ AI Network Intrusion Detection Dashboard")
+# --- HOME ---
+if st.session_state.page == "Home":
+    st.markdown("<h1 class='main-title'>AI-BASED NETWORK INTRUSION DECTION SYSTEM</h1>", unsafe_allow_html=True)
 
-st.markdown(
-"""
-Real-time **Machine Learning Network Threat Detection Dashboard**
+    col1, col2 = st.columns(2)
 
-Model: Random Forest  
-Dataset: UNSW-NB15
-"""
-)
+    with col1:
+        st.markdown("""
+        <div class='info-card'>
+        <h3>🧠 Model Intelligence</h3>
+        <p>This system is powered by a Random Forest Classifier that analyzes network traffic patterns using multiple decision trees.</p>
+        <p>Each packet is evaluated across trees, and the final decision is based on collective voting.</p>
+        <p><b>Advantages:</b><br>
+        • Handles complex network data<br>
+        • Resistant to noise and anomalies<br>
+        • Captures feature interactions effectively</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-# -----------------------------
-# Metrics
-# -----------------------------
+    with col2:
+        st.markdown("""
+        <div class='info-card'>
+        <h3>🚀 Why ANIDS?</h3>
+        <ul>
+            <li>Real-Time Detection</li>
+            <li>Explainable Predictions</li>
+            <li>Visual Threat Analysis</li>
+            <li>Scalable for large datasets</li>
+        </ul>
+        </div>
+        """, unsafe_allow_html=True)
 
-col1,col2,col3 = st.columns(3)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    center_col = st.columns([2,1,2])
+    with center_col[1]:
+        if st.button("INITIALIZE SYSTEM →"):
+            go_to("Upload")
 
-col1.metric("Model Accuracy","87.2%")
-col2.metric("Features Used",len(features))
-col3.metric("Algorithms Tested","4")
+# --- UPLOAD ---
+elif st.session_state.page == "Upload":
+    st.title("📂 Data Ingestion")
 
-st.markdown("---")
-
-# -----------------------------
-# Sidebar
-# -----------------------------
-
-st.sidebar.title("📂 Upload Network Data")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Upload CSV File",
-    type=["csv"]
-)
-
-# Dataset Requirements Toggle
-
-st.sidebar.markdown("---")
-
-if st.sidebar.checkbox("Show Dataset Requirements"):
-
-    st.sidebar.markdown("### Required Dataset Structure")
-
-    st.sidebar.markdown("""
-Your CSV must contain **42 network traffic features** used by the machine learning model.
-
-Each row represents **one network connection record captured from network traffic**.
+    # 🔽 USER CONTROLLED DATA GUIDE
+    with st.expander("ℹ️ What data should I upload?"):
+        st.markdown("""
+        The following are the features that are needed to be present in your CSV file, and each row represents **one network connection record captured from network traffic**.
 
 ### Feature Explanations
 
@@ -177,145 +204,99 @@ Each row represents **one network connection record captured from network traffi
 • **ct_dst_sport_ltm** – Destination connections with same source port
 
 • **ct_dst_src_ltm** – Destination connections from same source
-""")
 
-# -----------------------------
-# Data Source Logic
-# -----------------------------
+⚠️ Your dataset must contain the same features used during model training.
 
-if uploaded_file is not None:
+**Tip:** Upload clean CSV data with no missing values for best performance.
+        """)
 
-    input_df = pd.read_csv(uploaded_file)
-    data_source = uploaded_file.name
+    file = st.file_uploader("Upload Network Traffic Dataset (CSV)", type="csv")
 
-else:
+    if file:
+        df = pd.read_csv(file)
 
-    input_df = sample.copy()
-    data_source = "demo_sample.csv"
+        st.write("### Sampled Traffic Snapshot")
+        st.write("Preview of selected network records used for threat analysis.")
+        st.dataframe(df.head(10), use_container_width=True)
 
-# Ensure correct feature order
-input_df = input_df[features]
+        if st.button("🚀 Run Intrusion Detection"):
+            with st.status("Analyzing Network Patterns...", expanded=True):
+                probs = model.predict_proba(df[features])
+                preds = model.predict(df[features])
 
-# -----------------------------
-# Packet Data Toggle
-# -----------------------------
+                df['PRED'] = preds
+                df['CONF'] = np.max(probs, axis=1) * 100
 
-if st.checkbox("Show Packet Feature Data Used For Testing"):
+                st.session_state.analyzed_data = df
+                time.sleep(1.5)
+                go_to("Results")
 
-    st.subheader(f"Packet Data Source: {data_source}")
+# --- RESULTS ---
+elif st.session_state.page == "Results":
+    st.title("🔍 Results")
 
-    st.dataframe(input_df, use_container_width=True)
-
-# -----------------------------
-# Detection Section
-# -----------------------------
-
-st.markdown("---")
-st.subheader("Threat Analysis")
-
-if st.button("🚀 Run Intrusion Detection"):
-
-    prediction = model.predict(input_df)[0]
-    probability = model.predict_proba(input_df)[0]
-
-    confidence = max(probability)*100
-
-    st.markdown("## Detection Result")
-
-    if prediction == 1:
-        st.error("🚨 MALICIOUS NETWORK ATTACK DETECTED")
+    if st.session_state.analyzed_data is None:
+        st.info("No data available. Please upload dataset.")
     else:
-        st.success("✅ NETWORK TRAFFIC IS SAFE")
+        df = st.session_state.analyzed_data
+        threats = df[df['PRED'] == 1]
 
-    # Metrics
+        if threats.empty:
+            st.success("✅ No threats detected. Network is secure.")
+        else:
+            col1, col2 = st.columns([1,2])
 
-    col1,col2,col3 = st.columns(3)
+            with col1:
+                st.write("### Prediction Distribution Overview")
+                fig, ax = plt.subplots()
+                ax.pie([len(threats), len(df)-len(threats)],
+                       labels=['Threat', 'Safe'],
+                       autopct='%1.1f%%',
+                       colors=['#ff4b4b', '#00ff9c'])
+                ax.legend()
+                st.pyplot(fig)
 
-    col1.metric("Detection Confidence",f"{confidence:.2f}%")
-    col2.metric("Model Accuracy","87.2%")
-    col3.metric("Data Source",data_source)
+            with col2:
+                # SIMPLE CONFIDENCE
+                confidence = threats['CONF'].mean()
+                st.metric("Model Confidence Score", f"{confidence:.2f}%")
 
-    st.progress(confidence/100)
+                st.write("---")
 
-    st.markdown("---")
+                if threats['rate'].mean() > 5000:
+                    attack = "Denial-of-Service (DoS)"
+                    reason = "High packet transmission rate detected"
+                    prevention = [
+                        "Apply rate limiting",
+                        "Enable firewall filtering",
+                        "Monitor abnormal traffic spikes"
+                    ]
+                elif threats['sttl'].mean() > 128:
+                    attack = "Reconnaissance / Probe"
+                    reason = "Suspicious TTL patterns detected"
+                    prevention = [
+                        "Block scanning IPs",
+                        "Enable IDS/IPS alerts",
+                        "Monitor port scan activity"
+                    ]
+                else:
+                    attack = "Unknown Anomaly"
+                    reason = "Irregular packet behavior detected"
+                    prevention = [
+                        "Inspect packet payload",
+                        "Enable deep packet inspection",
+                        "Monitor unusual connections"
+                    ]
 
-    # -----------------------------
-    # Charts Layout
-    # -----------------------------
+                st.error(f"🚨 Threat Identified: {attack}")
 
-    chart1,chart2 = st.columns(2)
+                st.write("### Detection Reasoning")
+                st.write(reason)
 
-    # Attack Probability Chart
+                st.write("### Recommended Mitigation")
+                for p in prevention:
+                    st.write(f"• {p}")
 
-    with chart1:
-
-        st.subheader("Attack Probability")
-
-        labels=["Safe Traffic","Attack Traffic"]
-        values=probability
-
-        fig,ax=plt.subplots()
-
-        fig.patch.set_facecolor("#0b0f19")
-        ax.set_facecolor("#0b0f19")
-
-        ax.bar(labels,values,color="#00ff9c")
-
-        ax.tick_params(colors="#00ff9c")
-        ax.set_ylabel("Probability",color="#00ff9c")
-        ax.set_title("Threat Probability",color="#00ff9c")
-
-        for spine in ax.spines.values():
-            spine.set_color("#00ff9c")
-
-        st.pyplot(fig)
-
-    # Feature Importance Chart
-
-    with chart2:
-
-        st.subheader("Top Detection Features")
-
-        importances=model.feature_importances_
-
-        importance_df=pd.DataFrame({
-            "Feature":features,
-            "Importance":importances
-        }).sort_values(by="Importance",ascending=False).head(10)
-
-        fig2,ax2=plt.subplots()
-
-        fig2.patch.set_facecolor("#0b0f19")
-        ax2.set_facecolor("#0b0f19")
-
-        ax2.barh(
-            importance_df["Feature"],
-            importance_df["Importance"],
-            color="#00ff9c"
-        )
-
-        ax2.tick_params(colors="#00ff9c")
-        ax2.set_title("Feature Importance",color="#00ff9c")
-
-        for spine in ax2.spines.values():
-            spine.set_color("#00ff9c")
-
-        st.pyplot(fig2)
-
-# -----------------------------
-# Footer
-# -----------------------------
-
+# --- FOOTER ---
 st.markdown("---")
-
-st.markdown(
-"""
-Cybersecurity AI Dashboard
-
-Machine Learning Models Tested:
-- Random Forest
-- Gradient Boosting
-- K-Nearest Neighbors
-- Decision Tree
-"""
-)
+st.caption("ANIDS Framework | Intelligent Network Intrusion Detection System")
